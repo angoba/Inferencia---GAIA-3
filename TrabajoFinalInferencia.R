@@ -42,7 +42,7 @@ names(A); names(B)
 # 4) Función de preparación
 # ----------------------------
 prep <- function(df, zone_lab){
-  # 4.1 Estandariza nombres (si alguno falta, 'rename' lo ignora silenciosamente)
+  # 4.1 Estandariza nombres
   df <- df %>%
     dplyr::rename(
       source_id         = dplyr::any_of("source_id"),
@@ -57,15 +57,14 @@ prep <- function(df, zone_lab){
       random_index      = dplyr::any_of("random_index")
     )
   
-  # 4.2 Crea razón señal-ruido de la paralaje (útil para cortes de calidad)
+  # 4.2 Crea razón señal-ruido de la paralaje
   df <- df %>%
     dplyr::mutate(
       parallax_over_error = parallax / parallax_error,
       zone = zone_lab
     )
   
-  # 4.3 Filtro suave de color BP-RP (opcional pero recomendado):
-  #     Elimina valores absurdos/espurios; el rango -2..6 es amplio y poco agresivo.
+  # 4.3 Filtro suave de color BP-RP:
   df <- df %>%
     dplyr::filter(is.na(bp_rp) | (bp_rp > -2 & bp_rp < 6))
   
@@ -99,11 +98,10 @@ AB <- dplyr::bind_rows(A_clean, B_clean)
 vars_required <- c("phot_g_mean_mag", "bp_rp", "parallax", "parallax_error", "zone")
 setdiff(vars_required, names(AB))  # debería devolver character(0)
 
-# 6.2 Rangos razonables (ojo: magnitud alta = objeto más débil; no filtramos aquí)
+# 6.2 Rangos razonables
 summary(AB$phot_g_mean_mag)
 summary(AB$bp_rp)
 
-# 6.3 ¿Tenemos l/b? Si no, trabajaremos con ra/dec sin problema.
 has_lb  <- all(c("l","b") %in% names(AB))
 has_radec <- all(c("ra","dec") %in% names(AB))
 cat("Tiene l/b:", has_lb, " | Tiene ra/dec:", has_radec, "\n")
@@ -131,7 +129,7 @@ if (has_lb) {
 # - Comparar las distribuciones de magnitud (phot_g_mean_mag)
 #   y color (bp_rp) entre las zonas A (plano galáctico) y B (polo galáctico).
 # - Resumir medias, dispersiones y tamaños muestrales por zona
-#   como insumo para las pruebas de hipótesis posteriores.
+#   contexto para las pruebas de hipótesis posteriores.
 #########################
 
 # 2.1 Resúmenes numéricos por zona
@@ -176,7 +174,7 @@ ggplot(AB, aes(phot_g_mean_mag, fill = zone)) +
 # Diferencia de medianas entre zonas.
 
 # Diferencias de anchura (IQR): si A es más ancha en BP−RP, 
-# su varianza podría ser mayor ⇒ coherente con lo que testearás (F/Levene).
+# su varianza podría ser mayor
 # ----------------------------
 # Boxplot de magnitud G por zona
 # ----------------------------
@@ -242,7 +240,7 @@ getwd()
 
 # 1. Ilustración del Teorema del límite Central
 # ==============================
-# TLC: panel SOLO con Z_n
+# TLC: panel con Z
 # ==============================
 comparar_clt <- function(df, var, zone_sel = c("A","B"),
                          ns   = c(5, 10, 30, 100, 500, 1000),
@@ -343,7 +341,6 @@ consistencia <- function(df, var = "bp_rp", zone = "A",
     theme_minimal(base_size = 11)
 }
 
-# Ejemplo (recomendado):
 consistencia(AB, var = "bp_rp", zone = "A")
 
 #####
@@ -357,7 +354,7 @@ suficiencia <- function(df, var = "bp_rp", zone = "A", n = 2000, seed = 123) {
   x <- x[is.finite(x)]
   sample_x <- sample(x, n)
   
-  # 2) Estadísticos (posibles suficientes bajo supuesta normalidad)
+  # 2) Estadísticos
   xbar <- mean(sample_x)
   s    <- sd(sample_x)
   
@@ -444,7 +441,6 @@ ci_demo <- function(df, var = "bp_rp", zone = "A",
   list(plot = p, resumen = resumen)
 }
 
-# Ejemplo de uso:
 out <- ci_demo(AB, var = "bp_rp", zone = "A", n_vec = c(30, 200), conf = 0.95, reps = 400)
 out$plot
 out$resumen
@@ -515,7 +511,6 @@ rao_blackwell_demo <- function(df, var = "bp_rp", zone = "A",
   list(plot = p, resumen = resumen)
 }
 
-# --- Ejecuta:
 out <- rao_blackwell_demo(AB, var = "bp_rp", zone = "A", ns = c(10,50,200), reps = 2000)
 out$plot
 out$resumen
@@ -659,7 +654,7 @@ ggplot(df_ic, aes(x = "Color A-B", y = estimate)) +
 # Prueba 4 — Color BP−RP: comparación de varianzas entre zonas (F de Fisher)
 # H0: σ_A^2 = σ_B^2
 # H1: σ_A^2 ≠ σ_B^2
-# Las varianzas son muy similares; con n = 200 por zona se anticipa que no se rechace H0.
+# Las varianzas son muy similares. con n = 200 por zona se anticipa que no se rechace H0.
 C_var <- take_sample(AB, bp_rp, n_per_zone = 200)
 desc_4 <- brief_desc(C_var, bp_rp); print(desc_4)
 
@@ -735,11 +730,10 @@ ggplot(df_ic, aes(x = "A-B", y = estimate)) +
 # Variable: brillo G (phot_g_mean_mag)
 # Diseño deliberadamente deficiente:
 #  - Muestra muy pequeña (n = 5 por zona)
-#  - Se fuerza var.equal = TRUE a pesar de que las varianzas no son iguales
 # Objetivo: mostrar que una mala especificación del modelo puede llevar a rechazar H0 sin justificación.
-set.seed(4)  # <- cambia este número (por ej. 7, 42, 2025...) para probar otros casos
+set.seed(4)  
 
-# 1) Submuestra pequeña por zona (sin reemplazo)
+# 1) Submuestra pequeña por zona
 G_small <- AB %>%
   filter(zone %in% c("A","B")) %>%
   select(zone, phot_g_mean_mag) %>%
@@ -758,7 +752,7 @@ desc_small <- G_small %>%
             .groups = "drop")
 print(desc_small)
 
-# 3) PRUEBA MAL PLANTEADA: t de Student (var.equal = TRUE)
+# 3) PRUEBA MAL PLANTEADA: t de Student
 tt_bad <- t.test(phot_g_mean_mag ~ zone, data = G_small,
                  var.equal = TRUE,  # <- suposición errónea
                  alternative = "two.sided", conf.level = 0.95)
@@ -829,14 +823,14 @@ print(res_edu)
 alpha    = alpha
 power    = 0.80
 Delta    = 0.52   # diferencia empírica aproximada de medias entre zonas
-sigma    = 0.65   # desviación estándar aproximada (pooled) de bp_rp
+sigma    = 0.65   # desviación estándar aproximada de bp_rp
 z_alpha  = qnorm(1 - alpha/2)
 z_beta   = qnorm(power)
 n_per_group <- ((z_alpha + z_beta) * sigma / Delta)^2
 
 n_per_group
 
-# 5) Verificación con un tamaño muestral cercano a n_per_group (por ejemplo, n=40)
+# 5) Verificación con un tamaño muestral cercano
 n <- 40
 C_n <- AB %>%
   filter(zone %in% c("A","B")) %>%
@@ -871,4 +865,5 @@ tibble(
   ci99_hi  = tt$conf.int[2],
   decision = ifelse(tt$p.value < 0.01, "Rechaza H0 (α=0.01)", "NO rechaza H0 (α=0.01)")
 )
+
 
